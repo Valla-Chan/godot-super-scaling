@@ -1,6 +1,8 @@
 [gd_scene load_steps=2 format=2]
 
-[ext_resource path="SuperScaling.gd" type="Script" id=1]
+[ext_resource path="res://Engine/addons/SuperScaling/SuperScaling.gd" type="Script" id=1]
 
-[node name="SuperScaling" type="Node"]
+[node name="SuperScaling" type="ViewportContainer"]
 script = ExtResource( 1 )
+
+[node name="Base" type="Node2D" parent="."]

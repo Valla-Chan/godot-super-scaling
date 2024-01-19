@@ -1,78 +1,97 @@
 # [Godot Super Scaling]
 # created by Andres Hernandez
+# modified for Ghodost2D by Allison Ghost
+class_name SuperScaler
 extends Node
 
-export (float, 0.1, 2.0) var scale_factor = 1.0 setget change_scale_factor
-export (float, 0.0, 1.0) var smoothness = 0.5 setget change_smoothness
+enum {USAGE_3D, USAGE_2D}
+const epsilon := 0.01
+
+'''CATEGORY''' export var _c_include:int
+export (Array, NodePath) var affected_nodes = [null] # Include the game camera and world.
+'''CATEGORY''' export var _c_viewport:int
+export (float, 0.1, 4.0) var scale_factor = 1.0 setget change_scale_factor
+export (float, 0.0, 1.0) var smoothness = 1.0 setget change_smoothness
 export (bool) var enable_on_play = false
-export (Array, NodePath) var ui_nodes
-export (int, "3D", "2D") var usage = 0
+export (int, "3D", "2D") var usage = 1
 export (int, "Disabled", "2X", "4X", "8X", "16X") var msaa = 0 setget change_msaa
 export (bool) var fxaa = false setget change_fxaa
-export (int, 1, 4096) var shadow_atlas = 4096 setget change_shadow_atlas
+export (int, 1, 4096) var shadow_atlas = 1 setget change_shadow_atlas
+
+onready var viewport_base_node = $Base
 onready var sampler_shader = load(get_script().resource_path.get_base_dir() + "/SuperScaling.tres")
-var sampler_material
-var game_nodes
-var overlay
-var viewport
-var viewport_size
-var root_viewport
-var native_resolution
-var original_resolution
-var native_aspect_ratio
-var original_aspect_ratio
-enum {USAGE_3D, USAGE_2D}
-const epsilon = 0.01
-var finish_timer 
+var sampler_material : ShaderMaterial
+var game_nodes = []
+var overlay : ColorRect
+var viewport : Viewport
+var viewport_size : Vector2
+var root_viewport : Viewport
+var native_resolution : Vector2
+var original_resolution : Vector2
+var native_aspect_ratio : float
+var original_aspect_ratio : float
+var finish_timer : float
+
+# Return the node where objects are attached.
+func get_base_node() -> Node2D:
+	return viewport_base_node
+
+# Get a node by name or index from the affected_nodes[] list.
+func get_node(idx = 0) -> Node:
+	if idx is int:
+		if idx > -1 && idx < game_nodes.size():
+			return game_nodes[idx]
+	elif idx is String:
+		for node in game_nodes:
+			if node.name == idx:
+				return node
+	return null
 
 func _ready():
 	if (enable_on_play):
-		finish_setup()
+		_finish_setup()
 	
-func finish_setup():
-	remove_all_nodes()
-	get_screen_size()
-	create_viewport()
-	set_shader_texture()
-	add_all_nodes()
-	get_parent().call_deferred("add_child", viewport)
+func _finish_setup() -> void:
+	for index in affected_nodes.size():
+		game_nodes.append(get_node_or_null(affected_nodes[index]))
+	_remove_nodes()
+	_get_screen_size()
+	_create_viewport()
+	_set_shader_texture()
+	_add_nodes()
+	self.call_deferred("add_child", viewport)
+	self.rect_position -= (viewport.size / 4)
 	original_resolution = native_resolution
 	original_aspect_ratio = native_aspect_ratio
 	root_viewport = get_viewport()
 	#warning-ignore:RETURN_VALUE_DISCARDED
-	viewport.connect("size_changed", self, "on_window_resize")
+	viewport.connect("size_changed", self, "_on_window_resize")
 	#warning-ignore:RETURN_VALUE_DISCARDED
-	root_viewport.connect("size_changed", self, "on_window_resize")
-	on_window_resize()
-	create_sampler()
+	root_viewport.connect("size_changed", self, "_on_window_resize")
+	_on_window_resize()
+	_create_sampler()
 	change_msaa(msaa)
 	change_fxaa(fxaa)
 	change_smoothness(smoothness)
 	set_process_input(false)
 	set_process_unhandled_input(false)
 			
-func remove_all_nodes():
-	game_nodes = get_parent().get_children()
-	var ui_count = ui_nodes.size()
-	var done = false
-	while not done:
-		for i in range(game_nodes.size()):
-			if ui_nodes.has(get_path_to(game_nodes[i])):
-				game_nodes.remove(i)
-				break
-		ui_count -= 1
-		if ui_count <= 0:
-			done = true
-	game_nodes.erase(self)
+func _remove_nodes() -> void:
 	for node in game_nodes:
-		if node != self:
-			get_parent().call_deferred("remove_child", node)
+		if node != self && is_instance_valid(node):
+			node.get_parent().call_deferred("remove_child", node)
 	
-func add_all_nodes():
+func _add_nodes() -> void:
+	self.remove_child(viewport_base_node)
+	viewport.call_deferred("add_child", viewport_base_node)
 	for node in game_nodes:
-		viewport.call_deferred("add_child", node)
+		var pos = node.position
+		viewport_base_node = viewport_base_node
+		viewport_base_node.call_deferred("add_child", node)
+		node.position = pos - Vector2(256,256)
+		
 	
-func create_viewport():
+func _create_viewport() -> void:
 	viewport = Viewport.new()
 	viewport.name = "Viewport"
 	viewport.size = native_resolution
@@ -84,7 +103,7 @@ func create_viewport():
 	viewport.msaa = Viewport.MSAA_DISABLED
 	viewport.shadow_atlas_size = shadow_atlas
 	
-func create_sampler():
+func _create_sampler() -> void:
 	overlay = ColorRect.new()
 	overlay.name = "SamplerOverlay"
 	sampler_material = ShaderMaterial.new()
@@ -93,7 +112,7 @@ func create_sampler():
 	overlay.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(overlay)
 
-func set_shader_texture():
+func _set_shader_texture() -> void:
 	yield(VisualServer, "frame_post_draw")
 	var view_texture = viewport.get_texture()
 	view_texture.flags = 0
@@ -103,19 +122,19 @@ func set_shader_texture():
 	set_process_input(true)
 	set_process_unhandled_input(true)
 	
-func set_shader_resolution():
+func _set_shader_resolution() -> void:
 	if sampler_material:
 		sampler_material.set_shader_param("view_resolution", viewport_size)
 	
-func get_screen_size():
+func _get_screen_size() -> void:
 	var window = OS.window_size
 	native_resolution = window
 	native_aspect_ratio = native_resolution.x / native_resolution.y
 
-func set_viewport_size():
+func _set_viewport_size() -> void:
 	var res_float = native_resolution * scale_factor
 	viewport_size = Vector2(round(res_float.x), round(res_float.y))
-	var aspect_setting = get_aspect_setting()
+	var aspect_setting = _get_aspect_setting()
 	if native_aspect_ratio and original_aspect_ratio and (aspect_setting != "ignore" and aspect_setting != "expand"):
 		var aspect_diff = native_aspect_ratio / original_aspect_ratio
 		if usage == USAGE_2D:
@@ -129,13 +148,13 @@ func set_viewport_size():
 			elif aspect_diff < 1.0 - epsilon:
 				viewport_size = Vector2(round(res_float.x), round(res_float.y * aspect_diff))
 	
-func resize_viewport():
+func _resize_viewport() -> void:
 	if viewport:
 		viewport.size = viewport_size
 			
-func scale_viewport_canvas():
+func _scale_viewport_canvas() -> void:
 	if viewport:
-		var aspect_setting = get_aspect_setting()
+		var aspect_setting = _get_aspect_setting()
 		var aspect_diff = native_aspect_ratio / original_aspect_ratio
 		if aspect_setting == "ignore":
 			viewport.set_size_override(true, original_resolution)
@@ -155,10 +174,10 @@ func scale_viewport_canvas():
 				elif aspect_diff < 1.0 - epsilon:
 					viewport.set_size_override(true, Vector2(round(original_resolution.x), round(original_resolution.y / aspect_diff)))
 			
-func set_sampler_size():
+func _set_sampler_size() -> void:
 	if overlay:
-		var stretch_setting = get_stretch_setting()
-		var aspect_setting = get_aspect_setting()
+		var stretch_setting = _get_stretch_setting()
+		var aspect_setting = _get_aspect_setting()
 		var aspect_diff = native_aspect_ratio / original_aspect_ratio
 		if usage == USAGE_2D:
 			if aspect_diff < 1.0 - epsilon and aspect_setting == "keep_width":
@@ -224,40 +243,40 @@ func set_sampler_size():
 				if aspect_diff > 1.0 + epsilon:
 					overlay.rect_position.x = round((overlay_size.x * aspect_diff - overlay_size.x) * 0.5)
 				
-func change_scale_factor(val):
+func change_scale_factor(val) -> void:
 	scale_factor = val
-	on_window_resize()
+	_on_window_resize()
 	
-func change_smoothness(val):
+func change_smoothness(val) -> void:
 	smoothness = val
 	if sampler_material:
 		sampler_material.set_shader_param("smoothness", smoothness)
 		
-func change_msaa(val):
+func change_msaa(val) -> void:
 	msaa = val
 	if viewport:
 		viewport.msaa = msaa
 		
-func change_fxaa(val):
+func change_fxaa(val) -> void:
 	fxaa = val
 	if viewport:
 		viewport.fxaa = fxaa
 		
-func change_shadow_atlas(val):
+func change_shadow_atlas(val) -> void:
 	shadow_atlas = val
 	
-func on_window_resize():
-	get_screen_size()
-	set_viewport_size()
-	resize_viewport()
-	scale_viewport_canvas()
-	set_shader_resolution()
-	set_sampler_size()
+func _on_window_resize() -> void:
+	_get_screen_size()
+	_set_viewport_size()
+	_resize_viewport()
+	_scale_viewport_canvas()
+	_set_shader_resolution()
+	_set_sampler_size()
 	
-func get_aspect_setting():
+func _get_aspect_setting():
 	return ProjectSettings.get_setting("display/window/stretch/aspect")
 	
-func get_stretch_setting():
+func _get_stretch_setting():
 	return ProjectSettings.get_setting("display/window/stretch/mode")
 	
 func _input(event):
