@@ -1,4 +1,5 @@
-# Godot Super Scaling : Add-On For Godot Engine
+# Godot Super Scaling : Add-On For Godot Engine by Cybereality
+## 2D-fixes fork by Allison Ghost
 
 A fast viewport scaler for 3D and 2D Godot Engine games that allows you to upscale or downscale the screen for increased performance or higher quality visuals. Supports up to 200% native resolution or down to 10%. At 50% scaling on a 3D game, you could potentially get 200% to 300% of native performance, which is key to getting higher quality graphics on low-end hardware. At scales like 90%, you could gain 25% performance with very minimal picture quality loss. Going above 100% does increase quality, however the performance cost is large and might only make sense for users with very high-end graphics cards.
 
@@ -8,15 +9,25 @@ A fast viewport scaler for 3D and 2D Godot Engine games that allows you to upsca
 
 ## INSTALLATION
 
-[Click Here to Download the Latest Release](https://github.com/cybereality/godot-super-scaling/releases/latest)
-
 For manual install, download the `SuperScaling` folder from this repository and copy it into your Godot project.
+
+## CHANGES IN THIS FORK
+* Changes from all nodes being affected, to dropping nodes into a list. (This is meant to help limit it to an active level and camera)
+* Fixes offsetting of scaled viewport when including a camera
+* Increases max scale_factor to 4
+* Changes defaults to optimal 2D settings
+* Adds category markers to the inspector (requires the [ExportHelper addon](https://github.com/Valla-Chan/Godot-Valla-ExportHelper)
+* Adds static typing to variables, and re-organizes the code
+* Hides most internal functions from autofill
+* The SuperScaler longer removes itself, and exposed functions (`get_base_node()` and `get_node()`) have been added to get the included nodes from the SuperScaler by index or name, or to get the base node they can be attached to.
 
 ## CONFIGURATION
 
+New:
 * Add the `SuperScaling.tscn` scene to your main scene tree, it should be just below the root node.
-* You can leave the rest of your scene tree the same, this add-on no longer requires any special node setup.
-* To have UI or HUD elements rendered at native resolution, you should add them to the `UI Nodes` property.
+* Add whatever nodes you want to be superscaled into the "Included Nodes" array in the SuperScaling node. Including the game world and camera is recommended.
+* To have UI or HUD elements rendered at native resolution, simply do not include them in the list
+
 * Select `Enable on Play`, this will start the scaling add-on when you play the game (cannot be viewed in editor).
 * Set `Usage` to either `3D` or `2D` depending on your game type.
 * `MSAA` and `FXAA` are controlled by the `SuperScaling` add-on and the project settings do not take effect.
@@ -33,19 +44,18 @@ For manual install, download the `SuperScaling` folder from this repository and 
 * You should avoid setting `Smoothness` to the extremes. Values between `0.25` and `0.75` work best.
 * However, this is an artistic choice and you should experiment to find the best value for your game.
 * In the project settings, for 3D games, the `Stretch Mode` should be set to `disabled` and `Stretch Aspect` to `ignore`.
-* For 2D games, the best project settings are `2d` for `Stretch Mode` and `keep_height` for `Stretch Aspect`.
-* Native resolution UI nodes for 3D games can be anywhere, as long as they are added to the `UI Nodes` property.
-* For 2D games, you will need to create a `Node2D` and place your UI elements inside that. Then set the `Z Index` to `1` or above.
+* For 2D games, the best project settings are `2d` for `Stretch Mode` and `keep` or `keep_height` for `Stretch Aspect`.
 * Be sure that `Use VSync` is set to `On` in the project settings for the smoothest performance. Turning `Use VSync` to `Off` can result in stuttering and an overall choppy experience.
 * One thing to note, `SuperScaling` will take control of your game while enabled, and you will no longer be able to edit as you play. Meaning changing variables in the inspector at run-time will not result in visible changes (though you can click the `Remote` tab on the left and edit values, if really necessary).
 * So it is recommended to leave `Enable on Play` off while developing, and only enable the add-on when you need to test the graphics or performance.
-* Since the add-on moves your game nodes into a dynamically generated viewport, using `get_node()` with absolute paths will no longer function. It is recommended to try to use relative paths as much as possible when getting nodes, and this is supported. There are some cases, though, where special care must be taken. In the case of scripts on the root node, and also when calling in or out of the dynamic viewport (e.g. for a UI node to affect a game object, or vice versa), since the node paths will change at run-time. In these cases, rather than absolute paths, you can use the `find_node()` function, which will work regardless of where the nodes might be. For example `get_tree().get_root().find_node("Player", true, false)`. For this to work, though, all the nodes you are interested in getting this way must have unique names.
+* Since the add-on moves your game nodes into a dynamically generated viewport, using `get_node()` with absolute paths will no longer function. 2 functions have been added to `SuperScaler` in this fork to mitigate this: `get_base_node()` and `get_node()`. `get_base_node()` returns the Node2D that the included nodes are reparented to inside the viewport, and `get_node()` can be run with an index or name to return the included node. Both of these will work even while `Enable On Play` is turned off.
 
 ## LICENSE
 
 MIT License
 
 Copyright (c) 2021 Andres Hernandez
+Copyright (c) 2024 Allison Ghost
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

@@ -7,8 +7,8 @@ extends Node
 enum {USAGE_3D, USAGE_2D}
 const epsilon := 0.01
 
-'''CATEGORY''' export var _c_include:int
-export (Array, NodePath) var affected_nodes = [null] # Include the game camera and world.
+'''CATEGORY''' export var _c_nodes:int
+export (Array, NodePath) var included_nodes = [null] # Include the game camera and world.
 '''CATEGORY''' export var _c_viewport:int
 export (float, 0.1, 4.0) var scale_factor = 1.0 setget change_scale_factor
 export (float, 0.0, 1.0) var smoothness = 1.0 setget change_smoothness
@@ -48,16 +48,18 @@ func get_node(idx = 0) -> Node:
 	return null
 
 func _ready():
+	viewport_base_node = find_node("Base")
+	print(viewport_base_node)
 	if (enable_on_play):
 		_finish_setup()
+	else:
+		_pull_game_nodes()
 	
 func _finish_setup() -> void:
-	for index in affected_nodes.size():
-		game_nodes.append(get_node_or_null(affected_nodes[index]))
+	_pull_game_nodes()
 	_remove_nodes()
 	_get_screen_size()
 	_create_viewport()
-	_set_shader_texture()
 	_add_nodes()
 	self.call_deferred("add_child", viewport)
 	self.rect_position -= (viewport.size / 4)
@@ -70,12 +72,18 @@ func _finish_setup() -> void:
 	root_viewport.connect("size_changed", self, "_on_window_resize")
 	_on_window_resize()
 	_create_sampler()
+	_set_shader_texture()
 	change_msaa(msaa)
 	change_fxaa(fxaa)
 	change_smoothness(smoothness)
 	set_process_input(false)
 	set_process_unhandled_input(false)
-			
+
+func _pull_game_nodes():
+	for index in included_nodes.size():
+		if included_nodes[index] is NodePath:
+			game_nodes.append(get_node_or_null(included_nodes[index]))
+	
 func _remove_nodes() -> void:
 	for node in game_nodes:
 		if node != self && is_instance_valid(node):
@@ -85,12 +93,9 @@ func _add_nodes() -> void:
 	self.remove_child(viewport_base_node)
 	viewport.call_deferred("add_child", viewport_base_node)
 	for node in game_nodes:
-		var pos = node.position
 		viewport_base_node = viewport_base_node
 		viewport_base_node.call_deferred("add_child", node)
-		node.position = pos - Vector2(256,256)
-		
-	
+
 func _create_viewport() -> void:
 	viewport = Viewport.new()
 	viewport.name = "Viewport"
