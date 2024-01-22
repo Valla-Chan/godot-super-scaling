@@ -49,7 +49,6 @@ func get_node(idx = 0) -> Node:
 
 func _ready():
 	viewport_base_node = find_node("Base")
-	print(viewport_base_node)
 	if (enable_on_play):
 		_finish_setup()
 	else:
@@ -284,10 +283,11 @@ func _get_aspect_setting():
 func _get_stretch_setting():
 	return ProjectSettings.get_setting("display/window/stretch/mode")
 	
-func _input(event):
-	if viewport and is_inside_tree():
-		viewport.input(event)
+#func _input(event):
+#	if viewport and is_inside_tree():
+#		pass
+		#viewport.input(event)
 		
-func _unhandled_input(event):
-	if viewport and is_inside_tree():
-		viewport.unhandled_input(event)
+#func _unhandled_input(event):
+#	if viewport and is_inside_tree():
+#		viewport.unhandled_input(event)
