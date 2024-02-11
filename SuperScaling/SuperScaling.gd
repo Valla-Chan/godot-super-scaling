@@ -75,8 +75,8 @@ func _finish_setup() -> void:
 	change_msaa(msaa)
 	change_fxaa(fxaa)
 	change_smoothness(smoothness)
-	set_process_input(false)
-	set_process_unhandled_input(false)
+	#set_process_input(false)
+	#set_process_unhandled_input(false)
 
 func _pull_game_nodes():
 	for index in included_nodes.size():
@@ -123,8 +123,8 @@ func _set_shader_texture() -> void:
 	view_texture.viewport_path = viewport.get_path()
 	sampler_material.set_shader_param("viewport", view_texture)
 	change_scale_factor(scale_factor)
-	set_process_input(true)
-	set_process_unhandled_input(true)
+	#set_process_input(true)
+	#set_process_unhandled_input(true)
 	
 func _set_shader_resolution() -> void:
 	if sampler_material:
