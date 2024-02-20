@@ -8,7 +8,8 @@ enum {USAGE_3D, USAGE_2D}
 const epsilon := 0.01
 
 '''CATEGORY''' export var _c_nodes:int
-export (Array, NodePath) var included_nodes = [null] # Include the game camera and world.
+export (Array, NodePath) var included_nodes = [null] # Include the game world.
+export (NodePath) var game_ui = null # Path to game UI
 '''CATEGORY''' export var _c_viewport:int
 export (float, 0.1, 4.0) var scale_factor = 1.0 setget change_scale_factor
 export (float, 0.0, 1.0) var smoothness = 1.0 setget change_smoothness
@@ -48,6 +49,7 @@ func get_node(idx = 0) -> Node:
 	return null
 
 func _ready():
+	GlEnts.superscaler = self
 	viewport_base_node = find_node("Base")
 	if (enable_on_play):
 		_finish_setup()
@@ -82,6 +84,9 @@ func _pull_game_nodes():
 	for index in included_nodes.size():
 		if included_nodes[index] is NodePath:
 			game_nodes.append(get_node_or_null(included_nodes[index]))
+	# get camera from game ui node
+	if game_ui is NodePath:
+		game_nodes.append(get_node_or_null(game_ui).get_node("Camera"))
 	
 func _remove_nodes() -> void:
 	for node in game_nodes:
