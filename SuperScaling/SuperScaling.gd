@@ -14,6 +14,7 @@ export (NodePath) var game_ui = null # Path to game UI
 export (float, 0.1, 4.0) var scale_factor = 1.0 setget change_scale_factor
 export (float, 0.0, 1.0) var smoothness = 1.0 setget change_smoothness
 export (bool) var enable_on_play = false
+export (bool) var use_transparency = true
 export (int, "3D", "2D") var usage = 1
 export (int, "Disabled", "2X", "4X", "8X", "16X") var msaa = 0 setget change_msaa
 export (bool) var fxaa = false setget change_fxaa
@@ -32,6 +33,10 @@ var original_resolution : Vector2
 var native_aspect_ratio : float
 var original_aspect_ratio : float
 var finish_timer : float
+
+var use_greenscreen := false
+
+var image_alpha = 1.0 setget set_image_alpha
 
 # Return the node where objects are attached.
 func get_base_node() -> Node2D:
@@ -55,7 +60,7 @@ func _ready():
 		_finish_setup()
 	else:
 		_pull_game_nodes()
-	
+
 func _finish_setup() -> void:
 	_pull_game_nodes()
 	_remove_nodes()
@@ -104,8 +109,9 @@ func _create_viewport() -> void:
 	viewport = Viewport.new()
 	viewport.name = "Viewport"
 	viewport.size = native_resolution
-	viewport.usage = Viewport.USAGE_3D if usage == USAGE_3D else Viewport.USAGE_2D
-	viewport.render_target_clear_mode = Viewport.CLEAR_MODE_NEVER
+	viewport.usage = Viewport.USAGE_2D if usage == USAGE_2D else Viewport.USAGE_3D
+	viewport.transparent_bg = true if use_transparency else false
+	viewport.render_target_clear_mode = Viewport.CLEAR_MODE_ALWAYS if use_transparency else Viewport.CLEAR_MODE_NEVER
 	viewport.render_target_update_mode = Viewport.UPDATE_ALWAYS
 	viewport.render_target_v_flip = true
 	viewport.size_override_stretch = true
@@ -123,10 +129,11 @@ func _create_sampler() -> void:
 
 func _set_shader_texture() -> void:
 	yield(VisualServer, "frame_post_draw")
-	var view_texture = viewport.get_texture()
+	var view_texture : Texture = viewport.get_texture()
 	view_texture.flags = 0
 	view_texture.viewport_path = viewport.get_path()
 	sampler_material.set_shader_param("viewport", view_texture)
+	#sampler_material.set_shader_param("use_greenscreen", use_greenscreen)
 	change_scale_factor(scale_factor)
 	#set_process_input(true)
 	#set_process_unhandled_input(true)
@@ -273,7 +280,11 @@ func change_fxaa(val) -> void:
 		
 func change_shadow_atlas(val) -> void:
 	shadow_atlas = val
-	
+
+func set_image_alpha(val):
+	if is_instance_valid(overlay):
+		overlay.modulate.a = float(val)
+
 func _on_window_resize() -> void:
 	_get_screen_size()
 	_set_viewport_size()

@@ -6,6 +6,9 @@ code = "// [Godot Super Scaling]
 shader_type canvas_item;
 render_mode unshaded;
 
+uniform bool use_greenscreen = false;
+uniform bool use_transparency = true;
+
 // viewport to sample and its resolution
 uniform sampler2D viewport;
 uniform vec2 view_resolution;
@@ -45,7 +48,7 @@ vec4 color_average(vec4 color_a, vec4 color_b) {
 }
 
 // take 9 samples and perform a directional average
-vec4 directional_average() {
+vec4 directional_average(bool remove_green) {
 	// get the colors of all 9 pixels in the 3x3 grid
 	vec4 pixel_0 = textureLod(viewport, center_pixel, 0.0); // center pixel
 	vec4 pixel_1 = textureLod(viewport, north_pixel, 0.0); // north pixel
@@ -56,6 +59,19 @@ vec4 directional_average() {
 	vec4 pixel_6 = textureLod(viewport, north_west_pixel, 0.0); // north-west pixel
 	vec4 pixel_7 = textureLod(viewport, south_east_pixel, 0.0); // south-east pixel
 	vec4 pixel_8 = textureLod(viewport, south_west_pixel, 0.0); // south-west pixel
+	
+	if (remove_green){
+		if (pixel_0.rgb == vec3(0,1,0)) { pixel_0.rgb = vec3(0,0,0); }
+		if (pixel_1.rgb == vec3(0,1,0)) { pixel_1.rgb = vec3(0,0,0); }
+		if (pixel_2.rgb == vec3(0,1,0)) { pixel_2.rgb = vec3(0,0,0); }
+		if (pixel_3.rgb == vec3(0,1,0)) { pixel_3.rgb = vec3(0,0,0); }
+		if (pixel_4.rgb == vec3(0,1,0)) { pixel_4.rgb = vec3(0,0,0); }
+		if (pixel_5.rgb == vec3(0,1,0)) { pixel_5.rgb = vec3(0,0,0); }
+		if (pixel_6.rgb == vec3(0,1,0)) { pixel_6.rgb = vec3(0,0,0); }
+		if (pixel_7.rgb == vec3(0,1,0)) { pixel_7.rgb = vec3(0,0,0); }
+		if (pixel_8.rgb == vec3(0,1,0)) { pixel_8.rgb = vec3(0,0,0); }
+	}
+	
 	
 	// find the maximum color difference for each of 12 directions
 	float dir_1 = color_diff(pixel_0, pixel_1); // center to north
@@ -140,15 +156,37 @@ vec4 super_sample(vec2 base_uv, vec4 frag, vec2 pixel) {
 	vec2 dy = deriv_y(base_uv, frag, pixel);
 	vec2 uv = vec2(0.0);
 	vec4 color = vec4(0.0);
+	vec4 color1 = vec4(0.0);
+	vec4 color2 = vec4(0.0);
+	vec4 color3 = vec4(0.0);
+	vec4 color4 = vec4(0.0);
 	uv = base_uv + offset_uv.x * dx + offset_uv.y * dy;
-	color += textureLod(viewport, uv, 0.0);
+	color1 = textureLod(viewport, uv, 0.0);
 	uv = base_uv - offset_uv.x * dx - offset_uv.y * dy;
-	color += textureLod(viewport, uv, 0.0);
+	color2 = textureLod(viewport, uv, 0.0);
 	uv = base_uv + offset_uv.y * dx - offset_uv.x * dy;
-	color += textureLod(viewport, uv, 0.0);
+	color3 = textureLod(viewport, uv, 0.0);
 	uv = base_uv - offset_uv.y * dx + offset_uv.x * dy;
-	color += textureLod(viewport, uv, 0.0);
-	color *= 0.25;
+	color4 = textureLod(viewport, uv, 0.0);
+	
+	float totals = 4.0;
+	if (use_greenscreen){
+		if (color1.rgb == vec3(0,1,0)) { color1.rgb = vec3(0,0,0); totals -= 1.0; }
+		if (color2.rgb == vec3(0,1,0)) { color2.rgb = vec3(0,0,0); totals -= 1.0; }
+		if (color3.rgb == vec3(0,1,0)) { color3.rgb = vec3(0,0,0); totals -= 1.0; }
+		if (color4.rgb == vec3(0,1,0)) { color4.rgb = vec3(0,0,0); totals -= 1.0; }
+	}
+	else if (use_transparency){
+		if (color1.a == 0.0) { color1.rgb = vec3(0,0,0); totals -= 1.0; }
+		if (color2.a == 0.0) { color2.rgb = vec3(0,0,0); totals -= 1.0; }
+		if (color3.a == 0.0) { color3.rgb = vec3(0,0,0); totals -= 1.0; }
+		if (color4.a == 0.0) { color4.rgb = vec3(0,0,0); totals -= 1.0; }
+	}
+	
+	color = color1 + color2 + color3 + color4;
+	if (totals > 0.0) {
+		color /= totals;
+	}
 	return color;
 }
 
@@ -174,10 +212,21 @@ void vertex() {
 
 // draw the new color on the screen
 void fragment() {
-	vec4 dir_avg = directional_average();
+	vec4 dir_avg = directional_average(use_greenscreen);
 	vec4 super = super_sample(UV, FRAGCOORD, view_pixel_size);
 	vec4 result = mix(dir_avg, super, smoothness);
-	result.a = 1.0;
+	if (use_greenscreen) {
+		vec4 dir_avg_prescreened = directional_average(false);
+		if (dir_avg_prescreened.rgb != vec3(0,1,0)) {
+			result.a = 1.0;
+		} else {
+			result.a = 0.0;
+		}
+	} else {
+		result.a = dir_avg.a;
+	}
+	
+	
 	COLOR = result;
 }
 "
