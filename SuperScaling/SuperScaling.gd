@@ -54,7 +54,8 @@ func get_node(idx = 0) -> Node:
 	return null
 
 func _ready():
-	GlEnts.superscaler = self
+	if get_parent().name == "SceneBase":
+		GlEnts.superscaler = self
 	viewport_base_node = find_node("Base")
 	if (enable_on_play):
 		_finish_setup()
