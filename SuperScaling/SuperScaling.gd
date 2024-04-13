@@ -59,8 +59,8 @@ func _ready():
 	viewport_base_node = find_node("Base")
 	yield(GlGameSettings,"settings_loaded")
 	if (enable_on_play && GlGameSettings.use_upsampling):
-		_finish_setup()
 		scale_factor = GlGameSettings.upsampling_scale
+		_finish_setup()
 	else:
 		_pull_game_nodes()
 
