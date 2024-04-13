@@ -144,7 +144,8 @@ func _set_shader_resolution() -> void:
 		sampler_material.set_shader_param("view_resolution", viewport_size)
 	
 func _get_screen_size() -> void:
-	var window = OS.window_size
+	#var window = OS.window_size
+	var window = GlUtility.get_precalculated_desired_window_size()
 	native_resolution = window
 	native_aspect_ratio = native_resolution.x / native_resolution.y
 
@@ -299,7 +300,7 @@ func _get_aspect_setting():
 	
 func _get_stretch_setting():
 	return ProjectSettings.get_setting("display/window/stretch/mode")
-	
+
 #func _input(event):
 #	if viewport and is_inside_tree():
 #		pass
