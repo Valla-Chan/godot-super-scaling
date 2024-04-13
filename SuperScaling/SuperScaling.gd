@@ -57,8 +57,10 @@ func _ready():
 	if get_parent().name == "SceneBase":
 		GlEnts.superscaler = self
 	viewport_base_node = find_node("Base")
-	if (enable_on_play):
+	yield(GlGameSettings,"settings_loaded")
+	if (enable_on_play && GlGameSettings.use_upsampling):
 		_finish_setup()
+		scale_factor = GlGameSettings.upsampling_scale
 	else:
 		_pull_game_nodes()
 
