@@ -11,10 +11,12 @@ const epsilon := 0.01
 export (Array, NodePath) var included_nodes = [null] # Include the game world.
 export (NodePath) var game_ui = null # Path to game UI
 '''CATEGORY''' export var _c_viewport:int
-export (float, 0.1, 4.0) var scale_factor = 1.0 setget change_scale_factor
-export (float, 0.0, 1.0) var smoothness = 1.0 setget change_smoothness
+export (float, 0.1, 8.0) var scale_factor := 1.0 setget change_scale_factor
+export (float, 0.0, 1.0) var smoothness := 1.0 setget change_smoothness
 export (bool) var enable_on_play = false
 export (bool) var use_transparency = true
+export (bool) var use_dynamic_resolution = false setget set_use_dynamic_res
+export (float) var resolution_calc_frequency = 1.0 # in seconds
 export (int, "3D", "2D") var usage = 1
 export (int, "Disabled", "2X", "4X", "8X", "16X") var msaa = 0 setget change_msaa
 export (bool) var fxaa = false setget change_fxaa
@@ -34,7 +36,8 @@ var native_aspect_ratio : float
 var original_aspect_ratio : float
 var finish_timer : float
 
-var use_greenscreen := false
+var dynamic_scale_factor := scale_factor
+#var use_greenscreen := false
 
 var image_alpha = 1.0 setget set_image_alpha
 
@@ -61,8 +64,37 @@ func _ready():
 	if (enable_on_play && GlGameSettings.use_upsampling):
 		scale_factor = GlGameSettings.upsampling_scale
 		_finish_setup()
+		yield(GlUtility.wait(3),"timeout")
+		if use_dynamic_resolution:
+			update_dynamic_resolution()
 	else:
 		_pull_game_nodes()
+
+# drop game scale to match target FPS.
+const frame_allowance := 5
+func update_dynamic_resolution():
+	var fps := Engine.get_frames_per_second()
+	var desired_fps := Engine.target_fps
+	var max_scale := 8 if GlGameSettings.maximized else 4
+	# measure and compare FPS against desired FPS
+	if fps > frame_allowance+1:
+		if desired_fps - frame_allowance > fps && dynamic_scale_factor > 1.0:
+			dynamic_scale_factor -= 1
+		elif desired_fps == fps && dynamic_scale_factor < max_scale:
+			dynamic_scale_factor += 1
+		# set new fps scale
+		dynamic_scale_factor = clamp(dynamic_scale_factor,1,max_scale)
+		# if the frame rate is consistently shit, turn off upscaling for next time.
+		if dynamic_scale_factor < 2: GlGameSettings.use_upsampling = false
+		
+	# wait, then re-assess.
+	yield(GlUtility.wait(resolution_calc_frequency),"timeout")
+	if use_dynamic_resolution:
+		update_dynamic_resolution()
+
+func set_use_dynamic_res(n:bool):
+	use_dynamic_resolution = n
+	dynamic_scale_factor = scale_factor
 
 func _finish_setup() -> void:
 	_pull_game_nodes()
@@ -114,7 +146,7 @@ func _create_viewport() -> void:
 	viewport.size = native_resolution
 	viewport.usage = Viewport.USAGE_2D if usage == USAGE_2D else Viewport.USAGE_3D
 	viewport.transparent_bg = true if use_transparency else false
-	viewport.render_target_clear_mode = Viewport.CLEAR_MODE_ALWAYS if use_transparency else Viewport.CLEAR_MODE_NEVER
+	viewport.render_target_clear_mode = Viewport.CLEAR_MODE_ALWAYS #if use_transparency else Viewport.CLEAR_MODE_ONLY_NEXT_FRAME
 	viewport.render_target_update_mode = Viewport.UPDATE_ALWAYS
 	viewport.render_target_v_flip = true
 	viewport.size_override_stretch = true
@@ -152,7 +184,7 @@ func _get_screen_size() -> void:
 	native_aspect_ratio = native_resolution.x / native_resolution.y
 
 func _set_viewport_size() -> void:
-	var res_float = native_resolution * scale_factor
+	var res_float = native_resolution * dynamic_scale_factor
 	viewport_size = Vector2(round(res_float.x), round(res_float.y))
 	var aspect_setting = _get_aspect_setting()
 	if native_aspect_ratio and original_aspect_ratio and (aspect_setting != "ignore" and aspect_setting != "expand"):
@@ -262,9 +294,14 @@ func _set_sampler_size() -> void:
 				overlay.rect_position.y = 0.0
 				if aspect_diff > 1.0 + epsilon:
 					overlay.rect_position.x = round((overlay_size.x * aspect_diff - overlay_size.x) * 0.5)
-				
+
+func change_scale_and_smoothness(scale):
+	GlEnts.superscaler.change_scale_factor(scale)
+	GlEnts.superscaler.change_smoothness(GlUtility.remap_range(scale,[1,4],[0,1]))
+
 func change_scale_factor(val) -> void:
 	scale_factor = val
+	dynamic_scale_factor = scale_factor
 	_on_window_resize()
 	
 func change_smoothness(val) -> void:
