@@ -4,6 +4,8 @@
 class_name SuperScaler
 extends Node
 
+var _yielder = SafeYielder.new(self)
+
 enum {USAGE_3D, USAGE_2D}
 const epsilon := 0.01
 
@@ -39,7 +41,7 @@ var finish_timer : float
 var dynamic_scale_factor := scale_factor
 #var use_greenscreen := false
 
-var image_alpha = 1.0 setget set_image_alpha
+var image_alpha := 1.0 setget set_image_alpha, get_image_alpha
 
 # Return the node where objects are attached.
 func get_base_node() -> Node2D:
@@ -60,15 +62,21 @@ func _ready():
 	if get_parent().name == "SceneBase":
 		GlEnts.superscaler = self
 	viewport_base_node = find_node("Base")
-	yield(GlGameSettings,"settings_loaded")
-	if (enable_on_play && GlGameSettings.use_upsampling):
+	if !GlGameSettings._settings_loaded:
+		yield(_yielder.wrap(GlGameSettings,"settings_loaded"),"completed")
+	if (enable_on_play && (GlEnts.superscaler != self || GlGameSettings.use_upsampling) ):
 		scale_factor = GlGameSettings.upsampling_scale
+		_pull_game_nodes()
 		_finish_setup()
-		yield(GlUtility.wait(3),"timeout")
+		yield(_yielder.wrap(GlUtility.wait(3),"timeout"),"completed")
 		if use_dynamic_resolution:
 			update_dynamic_resolution()
 	else:
 		_pull_game_nodes()
+	if is_instance_valid(overlay):
+		print("Superscaler ", self, " Global:", self == GlEnts.superscaler, ", is enabled.")
+	else:
+		print("Superscaler ", self, " Global:", self == GlEnts.superscaler, ", is disabled.")
 
 # drop game scale to match target FPS.
 const frame_allowance := 5
@@ -84,11 +92,14 @@ func update_dynamic_resolution():
 			dynamic_scale_factor += 1
 		# set new fps scale
 		dynamic_scale_factor = clamp(dynamic_scale_factor,1,max_scale)
+		
 		# if the frame rate is consistently shit, turn off upscaling for next time.
-		if dynamic_scale_factor < 2: GlGameSettings.use_upsampling = false
+		# TODO: make this OPTIONAL.
+		#if dynamic_scale_factor < 2: GlGameSettings.use_upsampling = false
+		#elif dynamic_scale_factor > 3: GlGameSettings.use_upsampling = true
 		
 	# wait, then re-assess.
-	yield(GlUtility.wait(resolution_calc_frequency),"timeout")
+	yield(_yielder.wrap(GlUtility.wait(resolution_calc_frequency),"timeout"),"completed")
 	if use_dynamic_resolution:
 		update_dynamic_resolution()
 
@@ -96,8 +107,16 @@ func set_use_dynamic_res(n:bool):
 	use_dynamic_resolution = n
 	dynamic_scale_factor = scale_factor
 
+func set_viewport_paused(state:bool):
+	if viewport:
+		if state:
+			viewport.render_target_update_mode = Viewport.UPDATE_DISABLED
+			viewport.render_target_clear_mode = Viewport.CLEAR_MODE_NEVER
+		else:
+			viewport.render_target_update_mode = Viewport.UPDATE_ALWAYS
+			viewport.render_target_clear_mode = Viewport.CLEAR_MODE_ALWAYS
+
 func _finish_setup() -> void:
-	_pull_game_nodes()
 	_remove_nodes()
 	_get_screen_size()
 	_create_viewport()
@@ -323,8 +342,14 @@ func change_shadow_atlas(val) -> void:
 	shadow_atlas = val
 
 func set_image_alpha(val):
+	image_alpha = float(val)
 	if is_instance_valid(overlay):
-		overlay.modulate.a = float(val)
+		overlay.modulate.a = image_alpha
+
+func get_image_alpha() -> float:
+	if is_instance_valid(overlay):
+		return overlay.modulate.a
+	else: return image_alpha
 
 func _on_window_resize() -> void:
 	_get_screen_size()
