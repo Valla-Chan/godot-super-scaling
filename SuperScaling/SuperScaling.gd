@@ -4,7 +4,7 @@
 class_name SuperScaler
 extends Node
 
-var _yielder = SafeYielder.new(self)
+#var _yielder = SafeYielder.new(self)
 
 enum {USAGE_3D, USAGE_2D}
 const epsilon := 0.01
@@ -63,12 +63,12 @@ func _ready():
 		GlEnts.superscaler = self
 	viewport_base_node = find_node("Base")
 	if !GlGameSettings._settings_loaded:
-		yield(_yielder.wrap(GlGameSettings,"settings_loaded"),"completed")
+		yield(GlGameSettings,"settings_loaded")
 	if (enable_on_play && (GlEnts.superscaler != self || GlGameSettings.use_upsampling) ):
 		scale_factor = GlGameSettings.upsampling_scale
 		_pull_game_nodes()
 		_finish_setup()
-		yield(_yielder.wrap(GlUtility.wait(3),"timeout"),"completed")
+		yield(GlUtility.wait(3),"timeout")
 		if use_dynamic_resolution:
 			update_dynamic_resolution()
 	else:
@@ -99,7 +99,7 @@ func update_dynamic_resolution():
 		#elif dynamic_scale_factor > 3: GlGameSettings.use_upsampling = true
 		
 	# wait, then re-assess.
-	yield(_yielder.wrap(GlUtility.wait(resolution_calc_frequency),"timeout"),"completed")
+	yield(GlUtility.wait(resolution_calc_frequency),"timeout")
 	if use_dynamic_resolution:
 		update_dynamic_resolution()
 
@@ -365,11 +365,14 @@ func _get_aspect_setting():
 func _get_stretch_setting():
 	return ProjectSettings.get_setting("display/window/stretch/mode")
 
-#func _input(event):
-#	if viewport and is_inside_tree():
-#		pass
-		#viewport.input(event)
-		
-#func _unhandled_input(event):
-#	if viewport and is_inside_tree():
-#		viewport.unhandled_input(event)
+var _flashing = false
+func flash_overlay():
+	_flashing = true
+	overlay.modulate = Color.yellow
+	yield(GlUtility.wait(0.5),"timeout")
+	overlay.modulate = Color.white
+	yield(GlUtility.wait(0.5),"timeout")
+	overlay.modulate = Color.yellow
+	yield(GlUtility.wait(0.5),"timeout")
+	overlay.modulate = Color.white
+	_flashing = false
