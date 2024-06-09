@@ -4,8 +4,6 @@
 class_name SuperScaler
 extends Node
 
-#var _yielder = SafeYielder.new(self)
-
 enum {USAGE_3D, USAGE_2D}
 const epsilon := 0.01
 
