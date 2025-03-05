@@ -71,10 +71,10 @@ func _ready():
 			update_dynamic_resolution()
 	else:
 		_pull_game_nodes()
-	if is_instance_valid(overlay):
-		print("Superscaler ", self, " Global:", self == GlEnts.superscaler, ", is enabled.")
-	else:
-		print("Superscaler ", self, " Global:", self == GlEnts.superscaler, ", is disabled.")
+	#if is_instance_valid(overlay):
+	#	print("Superscaler ", self, " Global:", self == GlEnts.superscaler, ", is enabled.")
+	#else:
+	#	print("Superscaler ", self, " Global:", self == GlEnts.superscaler, ", is disabled.")
 
 # drop game scale to match target FPS.
 const frame_allowance := 5
