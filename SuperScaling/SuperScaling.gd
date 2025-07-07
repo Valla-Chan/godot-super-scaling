@@ -57,7 +57,7 @@ func get_node(idx = 0) -> Node:
 	return null
 
 func _ready():
-	if get_parent().name == "SceneBase":
+	if get_parent() is SceneGameBase:
 		GlEnts.superscaler = self
 	viewport_base_node = find_node("Base")
 	if !GlGameSettings._settings_loaded:
@@ -71,7 +71,7 @@ func _ready():
 			update_dynamic_resolution()
 	else:
 		_pull_game_nodes()
-	#if is_instance_valid(overlay):
+	#if is_valid(overlay):
 	#	print("Superscaler ", self, " Global:", self == GlEnts.superscaler, ", is enabled.")
 	#else:
 	#	print("Superscaler ", self, " Global:", self == GlEnts.superscaler, ", is disabled.")
@@ -147,7 +147,7 @@ func _pull_game_nodes():
 	
 func _remove_nodes() -> void:
 	for node in game_nodes:
-		if node != self && is_instance_valid(node):
+		if node != self && is_valid(node):
 			node.get_parent().call_deferred("remove_child", node)
 	
 func _add_nodes() -> void:
@@ -341,11 +341,11 @@ func change_shadow_atlas(val) -> void:
 
 func set_image_alpha(val):
 	image_alpha = float(val)
-	if is_instance_valid(overlay):
+	if is_valid(overlay):
 		overlay.modulate.a = image_alpha
 
 func get_image_alpha() -> float:
-	if is_instance_valid(overlay):
+	if is_valid(overlay):
 		return overlay.modulate.a
 	else: return image_alpha
 
