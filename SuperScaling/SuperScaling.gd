@@ -4,7 +4,7 @@
 class_name SuperScaler
 extends Node
 
-enum {USAGE_3D, USAGE_2D}
+enum { USAGE_3D, USAGE_2D }
 const epsilon := 0.01
 
 '''CATEGORY''' export var _c_nodes:int
@@ -58,11 +58,11 @@ func get_node(idx = 0) -> Node:
 
 func _ready():
 	if get_parent() is SceneGameBase:
-		GlEnts.superscaler = self
+		GlUI.superscaler = self
 	viewport_base_node = find_node("Base")
 	if !GlGameSettings._settings_loaded:
 		yield(GlGameSettings,"settings_loaded")
-	if (enable_on_play && (GlEnts.superscaler != self || GlGameSettings.use_upsampling) ):
+	if (enable_on_play && (GlUI.superscaler != self || GlGameSettings.use_upsampling) ):
 		scale_factor = GlGameSettings.upsampling_scale
 		_pull_game_nodes()
 		_finish_setup()
@@ -72,9 +72,9 @@ func _ready():
 	else:
 		_pull_game_nodes()
 	#if is_valid(overlay):
-	#	print("Superscaler ", self, " Global:", self == GlEnts.superscaler, ", is enabled.")
+	#	print("Superscaler ", self, " Global:", self == GlUI.superscaler, ", is enabled.")
 	#else:
-	#	print("Superscaler ", self, " Global:", self == GlEnts.superscaler, ", is disabled.")
+	#	print("Superscaler ", self, " Global:", self == GlUI.superscaler, ", is disabled.")
 
 # drop game scale to match target FPS.
 const frame_allowance := 5
@@ -313,8 +313,8 @@ func _set_sampler_size() -> void:
 					overlay.rect_position.x = round((overlay_size.x * aspect_diff - overlay_size.x) * 0.5)
 
 func change_scale_and_smoothness(scale):
-	GlEnts.superscaler.change_scale_factor(scale)
-	GlEnts.superscaler.change_smoothness(GlUtility.remap_range(scale,[1,4],[0,1]))
+	GlUI.superscaler.change_scale_factor(scale)
+	GlUI.superscaler.change_smoothness(GlUtility.remap_range(scale,[1,4],[0,1]))
 
 func change_scale_factor(val) -> void:
 	scale_factor = val
