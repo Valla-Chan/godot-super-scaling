@@ -4,25 +4,26 @@
 class_name SuperScaler
 extends Node
 
+#warning-ignore-all:RETURN_VALUE_DISCARDED
+
 enum { USAGE_3D, USAGE_2D }
 const epsilon := 0.01
 
 '''CATEGORY''' export var _c_nodes:int
-export (Array, NodePath) var included_nodes = [null] # Include the game world.
-export (NodePath) var game_ui = null # Path to game UI
+export (Array, NodePath) var included_nodes := [null] # Include the game world.
 '''CATEGORY''' export var _c_viewport:int
 export (float, 0.1, 8.0) var scale_factor := 1.0 setget change_scale_factor
 export (float, 0.0, 1.0) var smoothness := 1.0 setget change_smoothness
-export (bool) var enable_on_play = false
-export (bool) var use_transparency = true
+export (bool) var enable_on_play := false
+export (bool) var use_transparency := true
 export (bool) var use_dynamic_resolution = false setget set_use_dynamic_res
 export (float) var resolution_calc_frequency = 1.0 # in seconds
-export (int, "3D", "2D") var usage = 1
-export (int, "Disabled", "2X", "4X", "8X", "16X") var msaa = 0 setget change_msaa
-export (bool) var fxaa = false setget change_fxaa
-export (int, 1, 4096) var shadow_atlas = 1 setget change_shadow_atlas
+export (int, "3D", "2D") var usage := 1
+export (int, "Disabled", "2X", "4X", "8X", "16X") var msaa := 0 setget change_msaa
+export (bool) var fxaa := false setget change_fxaa
+export (int, 1, 4096) var shadow_atlas := 1 setget change_shadow_atlas
 
-onready var viewport_base_node = $Base
+var viewport_base_node : Node2D
 onready var sampler_shader = load(get_script().resource_path.get_base_dir() + "/SuperScaling.tres")
 var sampler_material : ShaderMaterial
 var game_nodes = []
@@ -37,52 +38,52 @@ var original_aspect_ratio : float
 var finish_timer : float
 
 var dynamic_scale_factor := scale_factor
-#var use_greenscreen := false
 
 var image_alpha := 1.0 setget set_image_alpha, get_image_alpha
+
+signal setup()
 
 # Return the node where objects are attached.
 func get_base_node() -> Node2D:
 	return viewport_base_node
 
-# Get a node by name or index from the affected_nodes[] list.
-func get_node(idx = 0) -> Node:
-	if idx is int:
-		if idx > -1 && idx < game_nodes.size():
-			return game_nodes[idx]
-	elif idx is String:
-		for node in game_nodes:
-			if node.name == idx:
-				return node
-	return null
+func add_node(p_node:Node) -> void:
+	if (p_node.is_inside_tree()):
+		p_node.get_parent().remove_child(p_node)
+	viewport_base_node.add_child(p_node)
+
+func get_held_node(p_name:NodePath) -> Node:
+	return viewport_base_node.find_node(p_name)
 
 func _ready():
 	if get_parent() is SceneGameBase:
 		GlUI.superscaler = self
-	viewport_base_node = find_node("Base")
+	_create_basenode()
+	# Apply settings
 	if !GlGameSettings._settings_loaded:
-		yield(GlGameSettings,"settings_loaded")
-	if (enable_on_play && (GlUI.superscaler != self || GlGameSettings.use_upsampling) ):
+		GlGameSettings.connect("settings_loaded", self, "_setup")
+	else: _setup()
+
+func _setup() -> void:
+	# Apply to global superscaler if GlGameSettings.use_upsampling
+	# AND all others.
+	if (enable_on_play && (self != GlUI.superscaler || GlGameSettings.use_upsampling) ):
 		scale_factor = GlGameSettings.upsampling_scale
 		_pull_game_nodes()
 		_finish_setup()
-		yield(GlUtility.wait(3),"timeout")
-		if use_dynamic_resolution:
-			update_dynamic_resolution()
+		GlUtility.wait(3).connect("timeout", self, "update_dynamic_resolution")
 	else:
 		_pull_game_nodes()
-	#if is_valid(overlay):
-	#	print("Superscaler ", self, " Global:", self == GlUI.superscaler, ", is enabled.")
-	#else:
-	#	print("Superscaler ", self, " Global:", self == GlUI.superscaler, ", is disabled.")
+	emit_signal("setup")
 
-# drop game scale to match target FPS.
+# Drop game scale to match target FPS.
 const frame_allowance := 5
 func update_dynamic_resolution():
+	if !use_dynamic_resolution: return
 	var fps := Engine.get_frames_per_second()
 	var desired_fps := Engine.target_fps
 	var max_scale := 8 if GlGameSettings.maximized else 4
-	# measure and compare FPS against desired FPS
+	# Measure and compare FPS against desired FPS
 	if fps > frame_allowance+1:
 		if desired_fps - frame_allowance > fps && dynamic_scale_factor > 1.0:
 			dynamic_scale_factor -= 1
@@ -95,11 +96,9 @@ func update_dynamic_resolution():
 		# TODO: make this OPTIONAL.
 		#if dynamic_scale_factor < 2: GlGameSettings.use_upsampling = false
 		#elif dynamic_scale_factor > 3: GlGameSettings.use_upsampling = true
-		
+	
 	# wait, then re-assess.
-	yield(GlUtility.wait(resolution_calc_frequency),"timeout")
-	if use_dynamic_resolution:
-		update_dynamic_resolution()
+	GlUtility.wait(resolution_calc_frequency).connect("timeout", self, "update_dynamic_resolution")
 
 func set_use_dynamic_res(n:bool):
 	use_dynamic_resolution = n
@@ -119,14 +118,11 @@ func _finish_setup() -> void:
 	_get_screen_size()
 	_create_viewport()
 	_add_nodes()
-	self.call_deferred("add_child", viewport)
 	self.rect_position -= (viewport.size / 4)
 	original_resolution = native_resolution
 	original_aspect_ratio = native_aspect_ratio
 	root_viewport = get_viewport()
-	#warning-ignore:RETURN_VALUE_DISCARDED
 	viewport.connect("size_changed", self, "_on_window_resize")
-	#warning-ignore:RETURN_VALUE_DISCARDED
 	root_viewport.connect("size_changed", self, "_on_window_resize")
 	_on_window_resize()
 	_create_sampler()
@@ -140,11 +136,9 @@ func _finish_setup() -> void:
 func _pull_game_nodes():
 	for index in included_nodes.size():
 		if included_nodes[index] is NodePath:
-			game_nodes.append(get_node_or_null(included_nodes[index]))
-	# get camera from game ui node
-	if game_ui is NodePath:
-		game_nodes.append(get_node_or_null(game_ui).get_node("Camera"))
-	
+			var node = get_node_or_null(included_nodes[index])
+			if node: game_nodes.append(node)
+
 func _remove_nodes() -> void:
 	for node in game_nodes:
 		if node != self && is_valid(node):
@@ -156,6 +150,12 @@ func _add_nodes() -> void:
 	for node in game_nodes:
 		viewport_base_node = viewport_base_node
 		viewport_base_node.call_deferred("add_child", node)
+
+# Add Base node
+func _create_basenode() -> void:
+	viewport_base_node = Node2D.new()
+	viewport_base_node.name = "Base"
+	add_child(viewport_base_node)
 
 func _create_viewport() -> void:
 	viewport = Viewport.new()
@@ -169,6 +169,8 @@ func _create_viewport() -> void:
 	viewport.size_override_stretch = true
 	viewport.msaa = Viewport.MSAA_DISABLED
 	viewport.shadow_atlas_size = shadow_atlas
+	add_child(viewport)
+	#self.call_deferred("add_child", viewport)
 	
 func _create_sampler() -> void:
 	overlay = ColorRect.new()
@@ -185,7 +187,6 @@ func _set_shader_texture() -> void:
 	view_texture.flags = 0
 	view_texture.viewport_path = viewport.get_path()
 	sampler_material.set_shader_param("viewport", view_texture)
-	#sampler_material.set_shader_param("use_greenscreen", use_greenscreen)
 	change_scale_factor(scale_factor)
 	#set_process_input(true)
 	#set_process_unhandled_input(true)
@@ -313,8 +314,8 @@ func _set_sampler_size() -> void:
 					overlay.rect_position.x = round((overlay_size.x * aspect_diff - overlay_size.x) * 0.5)
 
 func change_scale_and_smoothness(scale):
-	GlUI.superscaler.change_scale_factor(scale)
-	GlUI.superscaler.change_smoothness(GlUtility.remap_range(scale,[1,4],[0,1]))
+	change_scale_factor(scale)
+	change_smoothness(GlUtility.remap_range(scale,[1,4],[0,1]))
 
 func change_scale_factor(val) -> void:
 	scale_factor = val
